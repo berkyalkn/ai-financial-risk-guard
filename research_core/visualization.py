@@ -4,8 +4,8 @@ import os
 def plot_results(experiments_history, save_dir='results'):
     """
     Args:
-        experiments_history (dict): Her deneyin eğitim geçmişi.
-        save_dir (str): Grafiklerin kaydedileceği klasör.
+        experiments_history (dict): Training history of each experiment.
+        save_dir (str): Folder to save graphics.
     """
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
