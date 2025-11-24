@@ -7,10 +7,11 @@ import random
 import os
 
 
-from data_setup import load_and_process_data as load_data
-from models import ShallowMLP, DeepFraudMLP
-from losses import WeightedBCELoss, FocalLoss, PolyLoss
+from data_setup import load_creditcard_data, load_churn_data
+from models import ShallowMLP, DeepFraudMLP, ResNetMLP
+from losses import WeightedBCELoss, FocalLoss, PolyLoss, DiceLoss
 from train import train_model
+from visualization import plot_results
 
 
 def set_seed(seed=42):
@@ -22,118 +23,175 @@ def set_seed(seed=42):
         torch.cuda.manual_seed_all(seed)
 
 
-def get_experiments(device):
+def get_experiment_configs(input_dim, device):
     experiments = {
      
         "EXP_01_Shallow_BCE": {
-            "model": ShallowMLP(input_dim=30),
+            "model": ShallowMLP(input_dim=input_dim),
             "criterion": nn.BCEWithLogitsLoss(),
-            "description": "Baseline: Shallow Network with Standard BCE"
-        }, 
+            "description": "Shallow Network with Standard BCE"
+        },
 
         "EXP_02_Shallow_WeightedBCE": {
-            "model": ShallowMLP(input_dim=30),
+            "model": ShallowMLP(input_dim=input_dim),
             "criterion": WeightedBCELoss(pos_weight=5.0, device=device),
-            "description": "Shallow Network with Weighted BCE" 
-        }, 
+            "description": "Shallow Network with Weighted BCE"
+        },
 
         "EXP_03_Shallow_Focal": {
-            "model": ShallowMLP(input_dim=30),
+            "model": ShallowMLP(input_dim=input_dim),
             "criterion": FocalLoss(gamma=2.0, alpha=0.25),
             "description": "Shallow Network with Focal Loss"
-        }, 
-        
-        "EXP_04_Deep_BCE": {
-            "model": DeepFraudMLP(input_dim=30),
-            "criterion": nn.BCEWithLogitsLoss(),
-            "description": "Benchmark: Deep Network with Standard BCE"
         },
-        
-        "EXP_05_Deep_WeightedBCE": {
-            "model": DeepFraudMLP(input_dim=30),
+
+        "EXP_04_Shallow_Poly": {
+            "model": ShallowMLP(input_dim=input_dim),
+            "criterion": PolyLoss(epsilon=1.0),
+            "description": "Shallow Network with PolyLoss"
+        },
+
+        "EXP_05_Shallow_Dice": {
+            "model": ShallowMLP(input_dim=input_dim),
+            "criterion": DiceLoss(smooth=1.0),
+            "description": "Shallow Network with Dice Loss"
+        },
+
+        "EXP_06_Deep_BCE": {
+            "model": DeepFraudMLP(input_dim=input_dim),
+            "criterion": nn.BCEWithLogitsLoss(),
+            "description": "Deep Network with Standard BCE"
+        },
+
+        "EXP_07_Deep_WeightedBCE": {
+            "model": DeepFraudMLP(input_dim=input_dim),
             "criterion": WeightedBCELoss(pos_weight=5.0, device=device), 
             "description": "Deep Network with Weighted BCE"
         },
-        
-        "EXP_06_Deep_Focal": {
-            "model": DeepFraudMLP(input_dim=30),
+
+        "EXP_08_Deep_Focal": {
+            "model": DeepFraudMLP(input_dim=input_dim),
             "criterion": FocalLoss(gamma=2.0, alpha=0.25),
             "description": "Deep Network with Focal Loss (Gamma=2.0)"
         },
 
-        "EXP_07_Deep_Poly": {
-            "model": DeepFraudMLP(input_dim=30),
+        "EXP_09_Deep_Poly": {
+            "model": DeepFraudMLP(input_dim=input_dim),
             "criterion": PolyLoss(epsilon=1.0),
-            "description": "Experimental: Deep Network with PolyLoss (Epsilon=1.0)"
+            "description": "Deep Network with PolyLoss"
+        },
+
+        "EXP_10_Deep_Dice": {
+            "model": DeepFraudMLP(input_dim=input_dim),
+            "criterion": DiceLoss(smooth=1.0),
+            "description": "Deep Network with Dice Loss"
+        },
+
+        "EXP_11_ResNet_BCE": {
+            "model": ResNetMLP(input_dim=input_dim),
+            "criterion": nn.BCEWithLogitsLoss(),
+            "description": "Residual Network with Standard BCE"
+        },
+
+        "EXP_12_ResNet_WeightedBCE": {
+            "model": ResNetMLP(input_dim=input_dim),
+            "criterion": WeightedBCELoss(pos_weight=5.0, device=device),
+            "description": "Residual Network with Weighted BCE" 
+        },
+
+        "EXP_13_ResNet_Focal": {
+            "model": ResNetMLP(input_dim=input_dim),
+            "criterion": FocalLoss(gamma=2.0, alpha=0.25),
+            "description": "Residual Network with Focal Loss"
+        },
+
+        "EXP_14_ResNet_Poly": {
+            "model": ResNetMLP(input_dim=input_dim),
+            "criterion": PolyLoss(epsilon=1.0),
+            "description": "Residual Network with PolyLoss"
+        },
+
+        "EXP_15_ResNet_Dice": {
+            "model": ResNetMLP(input_dim=input_dim),
+            "criterion": DiceLoss(smooth=1.0),
+            "description": "Residual Network with Dice Loss"
         }
     }
     return experiments
 
+def run_dataset_suite(dataset_name, loader_func, file_path, device, epochs=10):
+    print(f"\n{'#'*60}")
+    print(f"DATASET STARTING: {dataset_name}")
+    print(f"{'#'*60}")
 
-def run_experiments():
-    SEED = 42
-    BATCH_SIZE = 1024 
-    EPOCHS = 10    
-    LR = 0.001       
-    DATA_PATH = '../data/creditcard.csv'
-    
-    set_seed(SEED)
-    
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Running experiments on: {device}")
-
-
-    print("\n[1/3] Loading Data...")
     try:
-        train_loader, val_loader, test_loader = load_data(DATA_PATH, batch_size=BATCH_SIZE)
-    except FileNotFoundError:
+        train_loader, val_loader, test_loader, input_dim = loader_func(file_path, batch_size=1024)
+    except Exception as e:
+        print(f"Skipping {dataset_name} due to loading error: {e}")
+        return
+
+    experiments = get_experiment_configs(input_dim, device)
     
-        print("Data path error.")
-        train_loader, val_loader, test_loader = load_data('data/creditcard.csv', batch_size=BATCH_SIZE)
-
-
-    print("\n[2/3] Starting Experiments...")
-    experiments = get_experiments(device)
     results = {}
+    histories = {}
 
-    for exp_name, config in experiments.items():
-        print(f"\n{'='*60}")
-        print(f"Running: {exp_name}")
-        print(f"Info: {config['description']}")
-        print(f"{'='*60}")
-        
+    total_exps = len(experiments)
+    current_exp = 1
     
+    for exp_name, config in experiments.items():
+        print(f"\n--- [{current_exp}/{total_exps}] Running {exp_name} on {dataset_name} ---")
+        print(f"{config['description']}")
+        
         model = config['model'].to(device)
         criterion = config['criterion']
-        
-        optimizer = optim.Adam(model.parameters(), lr=LR)
+        optimizer = optim.Adam(model.parameters(), lr=0.001) 
         
         trained_model, history = train_model(
-            model, 
-            train_loader, 
-            val_loader, 
-            criterion, 
-            optimizer, 
-            num_epochs=EPOCHS, 
-            device=device
+            model, train_loader, val_loader, criterion, optimizer, 
+            num_epochs=epochs, device=device
         )
         
         best_score = max(history['val_prauc'])
         results[exp_name] = best_score
-        print(f"🏆 {exp_name} Finished. Best Val PR-AUC: {best_score:.4f}")
+        histories[exp_name] = history
+        print(f"Finished. Best PR-AUC: {best_score:.4f}")
+        current_exp += 1
 
-    print(f"\n{'='*60}")
-    print("FINAL RESULTS SUMMARY (Val PR-AUC)")
-    print(f"{'='*60}")
-    
-    sorted_results = sorted(results.items(), key=lambda x: x[1], reverse=True)
-    
-    for rank, (name, score) in enumerate(sorted_results, 1):
-        print(f"{rank}. {name:<25} : {score:.4f}")
-        
-    print(f"{'='*60}")
-    print("All experiments completed.")
+    save_folder = f"results/{dataset_name}"
+    plot_results(histories, save_dir=save_folder)
 
+    print(f"\nLEADERBOARD FOR {dataset_name} (PR-AUC)")
+    print("-" * 60)
+
+    sorted_res = sorted(results.items(), key=lambda x: x[1], reverse=True)
+
+    for rank, (name, score) in enumerate(sorted_res, 1):
+        print(f"{rank}. {name:<30} : {score:.4f}")
+    print("-" * 60)
+
+
+def main():
+    set_seed(42)
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Main Experiment started on device: {device}")
+    print("WARNING: This involves 30 total training runs (15 models x 2 datasets). This may take time!")
+
+    run_dataset_suite(
+        dataset_name="CreditCard",
+        loader_func=load_creditcard_data,
+        file_path="../data/creditcard.csv",
+        device=device,
+        epochs=5
+    )
+
+    run_dataset_suite(
+        dataset_name="Churn",
+        loader_func=load_churn_data,
+        file_path="../data/Churn_Modelling.csv",
+        device=device,
+        epochs=10
+    )
+
+    print("\n ALL EXPERIMENTS COMPLETED SUCCESSFULLY!")
 
 if __name__ == "__main__":
-    run_experiments()
+    main()
