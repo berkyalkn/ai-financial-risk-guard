@@ -110,6 +110,7 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, num_epoch
     history = {
         'train_loss': [], 'val_loss': [],
         'train_f1': [], 'val_f1': [],
+        'val_recall': [], 'val_precision': [],
         'train_prauc': [], 'val_prauc': []
     }
 
@@ -124,6 +125,8 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, num_epoch
         history['val_loss'].append(val_loss)
         history['train_f1'].append(train_metrics['f1'])
         history['val_f1'].append(val_metrics['f1'])
+        history['val_recall'].append(val_metrics['recall'])       
+        history['val_precision'].append(val_metrics['precision']) 
         history['train_prauc'].append(train_metrics['pr_auc'])
         history['val_prauc'].append(val_metrics['pr_auc'])
 

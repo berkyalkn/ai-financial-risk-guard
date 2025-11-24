@@ -197,14 +197,13 @@ def main():
     set_seed(42)
     device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
     print(f"Main Experiment started on device: {device}")
-    print("WARNING: This involves 30 total training runs (15 models x 2 datasets). This may take time!")
 
     run_dataset_suite(
         dataset_name="CreditCard",
         loader_func=load_creditcard_data,
         file_path="../data/creditcard.csv",
         device=device,
-        epochs=5
+        epochs=10
     )
 
     run_dataset_suite(
@@ -212,7 +211,7 @@ def main():
         loader_func=load_churn_data,
         file_path="../data/Churn_Modelling.csv",
         device=device,
-        epochs=10
+        epochs=15
     )
 
     print("\n ALL EXPERIMENTS COMPLETED SUCCESSFULLY!")
