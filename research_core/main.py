@@ -114,6 +114,30 @@ def get_experiment_configs(input_dim, device):
             "model": ResNetMLP(input_dim=input_dim),
             "criterion": DiceLoss(smooth=1.0),
             "description": "Residual Network with Dice Loss"
+        },
+
+        "EXP_16_ResNet_Focal_G05": {
+            "model": ResNetMLP(input_dim=input_dim),
+            "criterion": FocalLoss(gamma=0.5, alpha=0.25),
+            "description": "Ablation: ResNet with Low Gamma (0.5)"
+        },
+
+        "EXP_17_ResNet_Focal_G50": {
+            "model": ResNetMLP(input_dim=input_dim),
+            "criterion": FocalLoss(gamma=5.0, alpha=0.25),
+            "description": "Ablation: ResNet with High Gamma (5.0)"
+
+        },
+
+        "EXP_18_Weighted_W1": { 
+            "model": ResNetMLP(input_dim=input_dim),
+            "criterion": WeightedBCELoss(pos_weight=1.0, device=device),
+            "description": "Ablation: Weighted BCE with Neutral Weight (1.0)"
+        },
+        "EXP_19_Weighted_W100": { 
+            "model": ResNetMLP(input_dim=input_dim),
+            "criterion": WeightedBCELoss(pos_weight=100.0, device=device),
+            "description": "Ablation: Weighted BCE with High Weight (100.0)"
         }
     }
     return experiments

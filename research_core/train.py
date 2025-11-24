@@ -14,6 +14,9 @@ def calculate_metrics(y_true, y_pred_probs, threshold=0.5):
         threshold: Decision threshold.
     """
 
+    if np.isnan(y_pred_probs).any():
+        y_pred_probs = np.nan_to_num(y_pred_probs, nan=0.0)
+
     y_pred = (y_pred_probs >= threshold).astype(int)
     
     metrics = {
@@ -41,11 +44,19 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device):
         loss = criterion(outputs, labels)
 
         loss.backward() 
+
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
         optimizer.step() 
 
         running_loss += loss.item() * inputs.size(0)
         
         probs = torch.sigmoid(outputs).detach().cpu().numpy()
+
+        if np.isnan(probs).any():
+            probs = np.nan_to_num(probs, nan=0.0)
+
+
         all_preds.append(probs)
         all_targets.append(labels.cpu().numpy())
 
@@ -75,6 +86,11 @@ def evaluate(model, dataloader, criterion, device):
             running_loss += loss.item() * inputs.size(0)
             
             probs = torch.sigmoid(outputs).detach().cpu().numpy()
+
+            if np.isnan(probs).any():
+                probs = np.nan_to_num(probs, nan=0.0)
+
+
             all_preds.append(probs)
             all_targets.append(labels.cpu().numpy())
 
@@ -97,7 +113,6 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, num_epoch
         'train_prauc': [], 'val_prauc': []
     }
 
-    print(f"Starting training on {device}...")
     
     for epoch in range(num_epochs):
 
@@ -120,6 +135,10 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, num_epoch
             best_prauc = val_metrics['pr_auc']
             best_model_wts = copy.deepcopy(model.state_dict())
             print("  --> New Best Model Saved!")
+
+        if not np.isnan(val_metrics['pr_auc']) and val_metrics['pr_auc'] > best_prauc:
+            best_prauc = val_metrics['pr_auc']
+            best_model_wts = copy.deepcopy(model.state_dict())
 
 
     model.load_state_dict(best_model_wts)
